@@ -683,7 +683,9 @@ function App() {
 
 - 제대로 정의된 것 처럼 보이지만 제네릭은 함수 파라메터에만 적용되었을 뿐 함수 자체엔 적용되지 않았다.
 
-- 따라서 forwardRef에 대한 제네릭 타입 정의가 필요하다.
+  - render에 T와 P제네릭이 있는데 왜 리턴타입에는 해당 제네릭이 적용되지 않을까?
+
+- 따라서 forwardRef의 리턴 타입인 `ForwardRefExoticComponent<PropsWithoutRef<P> & RefAttributes<T>>`에 대한 제네릭 타입 정의가 필요하다.
 
 - 공식문서를 보면 forwardRef로 감싸게 되면 React Component를 반환하고 해당 컴포넌트는 ref를 전달받을 수 있게 되는데 위처럼 작성한 코드에서는 ref에 대한 타입이 모호하다.
 
@@ -728,13 +730,28 @@ interface ExoticComponent<P = {}> {
 
 - forwardRef의 리턴 타입인 `ForwardRefExoticComponent<PropsWithoutRef<P> & RefAttributes<T>>`에 대한 타입 지정이 필요한데
 
-- render에 해당하는 타입인 TextComponent 타입을 아래처럼 명시해주면 `ForwardRefRenderFunction<T, P>`에 대한 타입이 지정되므로 리턴 타입에 대한 타입도 지정이 된다
+- forwardRef의 리턴 타입을 타고 들어가서 보면 아래와 같다
 
-- props에 해당하는 타입은 `PolymorphicComponentProps<C, Props>`
+```ts
+interface ForwardRefExoticComponent<P> extends NamedExoticComponent<P> {
+  defaultProps?: Partial<P> | undefined;
+  propTypes?: WeakValidationMap<P> | undefined;
+}
 
-- ref에 해당하는 타입은 `{ ref?: PolymorphicRef<C>; }`인 것을 확인할 수 있다.
+interface NamedExoticComponent<P = {}> extends ExoticComponent<P> {
+  displayName?: string | undefined;
+}
 
-- 그리고 리턴 타입 또한 이를 통해서 다음과 같이 추론 되는 것을 알 수 있다. `ForwardRefExoticComponent<PropsWithoutRef<C, Props> & RefAttributes<C>>;`
+interface ExoticComponent<P = {}> {
+  /**
+   * **NOTE**: Exotic components are not callable.
+   */
+  (props: P): ReactElement | null;
+  readonly $$typeof: symbol;
+}
+```
+
+- forwardRef의 리턴 타입인 TextComponent 타입을 아래처럼 명시해주면
 
 ```ts
 type Rainbow = "red" | "orange" | "yellow";
@@ -788,6 +805,10 @@ export const Text: TextComponent = React.forwardRef(
   }
 );
 ```
+
+- P에 해당하는 타입은 `props: PolymorphicComponentPropsWithRef<C, TextProps>`가 되는 것이고
+
+- `type TextComponent`의 리턴 타입은 `ReactElement|null`이 되는 것이다.
 
 - 따라서 코드를 컴포넌트의 반환 타입을 명시해주는 방식으로 수정해주면 제대로된 ref가 전달되지 않는 경우 에러가 발생하는 것을 확인할 수 있다.
 
